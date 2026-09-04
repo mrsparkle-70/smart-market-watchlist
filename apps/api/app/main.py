@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import attention, auth, demo, market, portfolio, watchlists
-from app.core.config import settings
+from app.core.config import settings, _env_file
 from app.core.database import init_db
 from app.workers.pipeline import start_pipeline
 
@@ -53,3 +53,26 @@ app.include_router(demo.router)
 @app.get("/api/health")
 def health():
     return {"status": "ok", "provider": settings.MARKET_DATA_PROVIDER}
+
+
+@app.get("/api/debug/config")
+def debug_config():
+    """Debug endpoint to verify configuration is loaded correctly."""
+    return {
+        "status": "ok",
+        "env_file_found": _env_file is not None,
+        "env_file_path": _env_file,
+        "settings": {
+            "APP_NAME": settings.APP_NAME,
+            "ENV": settings.ENV,
+            "CORS_ORIGINS": settings.CORS_ORIGINS,
+            "DATABASE_URL": settings.DATABASE_URL[:50] + "..." if len(settings.DATABASE_URL) > 50 else settings.DATABASE_URL,
+            "REDIS_URL": settings.REDIS_URL if settings.REDIS_URL else "(not set)",
+            "MARKET_DATA_PROVIDER": settings.MARKET_DATA_PROVIDER,
+            "MARKET_DATA_API_KEY": "SET" if settings.MARKET_DATA_API_KEY else "(not set)",
+            "JWT_SECRET": "SET" if settings.JWT_SECRET else "(not set)",
+            "POLL_INTERVAL_SECONDS": settings.POLL_INTERVAL_SECONDS,
+            "PIPELINE_ENABLED": settings.PIPELINE_ENABLED,
+            "LLM_API_KEY": "SET" if settings.LLM_API_KEY else "(not set)",
+        },
+    }

@@ -587,4 +587,147 @@ npm run dev
 2. Register a new account
 3. Add symbols (AAPL, NVDA, MSFT, TSLA)
 4. Click "Refresh market data" to establish a baseline
+
+---
+
+## Environment Variables Not Loading (Windows Fix)
+
+### Problem
+When running the backend on Windows, the `.env` file is not being picked up. The app uses default values instead of your custom configuration.
+
+### Solution 1: Use the Debug Endpoint
+
+The app now includes a debug endpoint to verify configuration:
+
+```powershell
+# Start the backend, then check configuration:
+Invoke-RestMethod -Uri "http://localhost:8000/api/debug/config"
+```
+
+**Expected output (when .env is loaded correctly):**
+```json
+{
+  "status": "ok",
+  "env_file_found": true,
+  "env_file_path": "C:\\path\\to\\smart-market-watchlist\\.env",
+  "settings": {
+    "MARKET_DATA_PROVIDER": "finnhub",
+    "MARKET_DATA_API_KEY": "SET",
+    "JWT_SECRET": "SET"
+  }
+}
+```
+
+**Problem output (when .env is NOT loaded):**
+```json
+{
+  "status": "ok",
+  "env_file_found": false,
+  "env_file_path": null,
+  "settings": {
+    "MARKET_DATA_PROVIDER": "mock",
+    "MARKET_DATA_API_KEY": "(not set)",
+    "JWT_SECRET": "(not set)"
+  }
+}
+```
+
+### Solution 2: Copy .env to the Backend Directory
+
+```powershell
+# From the project root:
+copy .env apps\api\.env
+```
+
+### Solution 3: Set Environment Variables Manually
+
+**Windows PowerShell:**
+```powershell
+# Set variables for the current session
+$env:MARKET_DATA_PROVIDER="finnhub"
+$env:MARKET_DATA_API_KEY="your-key-here"
+$env:JWT_SECRET="your-secret-here"
+$env:DATABASE_URL="sqlite:///./watchlist.db"
+
+# Then run the backend
+uvicorn app.main:app --reload --port 8000
+```
+
+**Windows CMD:**
+```cmd
+set MARKET_DATA_PROVIDER=finnhub
+set MARKET_DATA_API_KEY=your-key-here
+set JWT_SECRET=your-secret-here
+uvicorn app.main:app --reload --port 8000
+```
+
+### Solution 4: Use python-dotenv (Alternative)
+
+If the automatic .env detection doesn't work, install python-dotenv:
+
+```powershell
+pip install python-dotenv
+```
+
+Then create a `.env` file directly in `apps\api\`:
+
+```powershell
+# Copy the .env file to the backend directory
+copy ..\.env .env
+```
+
+### Solution 5: Create .env in the Correct Location
+
+The app searches for `.env` in these locations (in order):
+1. Current working directory (`apps\api\.env`)
+2. Parent directory (`smart-market-watchlist\.env`)
+3. Grandparent directory (2 levels up)
+
+**Recommended:** Place your `.env` file in the **project root** (`smart-market-watchlist\.env`).
+
+### Verifying .env is Loaded
+
+```powershell
+# Check if the .env file exists in the root:
+Test-Path ".\.env"
+
+# View the .env content (to verify it exists):
+Get-Content ".\.env"
+
+# Check if the backend sees it:
+# Start the backend, then:
+Invoke-RestMethod -Uri "http://localhost:8000/api/debug/config" | ConvertTo-Json
+```
+
+### Common .env File Issues on Windows
+
+| Issue | Solution |
+|-------|----------|
+| File is named `.env.txt` | Rename to `.env` (disable "hide extensions" in File Explorer) |
+| File has BOM encoding | Save as UTF-8 without BOM |
+| File is in wrong location | Move to project root |
+| Variables not exported | Use `$env:VAR="value"` in PowerShell |
+| Path uses backslashes | Use forward slashes or double backslashes in paths |
+
+### Quick Fix Summary
+
+```powershell
+# 1. Make sure .env exists in project root
+copy .env.example .env
+
+# 2. Edit .env with your settings
+notepad .env
+
+# 3. Also copy to backend directory as fallback
+copy .env apps\api\.env
+
+# 4. Restart the backend
+cd apps\api
+.\.venv\Scripts\Activate.ps1
+uvicorn app.main:app --reload --port 8000
+
+# 5. Verify configuration
+Invoke-RestMethod -Uri "http://localhost:8000/api/debug/config"
+```
+
 5. Explore your personalized change brief

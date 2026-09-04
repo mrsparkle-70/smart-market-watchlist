@@ -1,11 +1,32 @@
 """Application configuration via environment variables (pydantic-settings)."""
 from __future__ import annotations
 from functools import lru_cache
+from pathlib import Path
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _find_env_file() -> str | None:
+    """Search for .env file in current and parent directories."""
+    current = Path.cwd()
+    for _ in range(4):
+        env_path = current / ".env"
+        if env_path.exists():
+            return str(env_path)
+        current = current.parent
+    return None
+
+
+_env_file = _find_env_file()
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=_env_file,
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
     # --- App ---
     APP_NAME: str = "Smart Market Watchlist API"
     ENV: str = "development"
@@ -21,8 +42,6 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7
 
     # --- Market data provider ---
-    # "mock" = deterministic simulated provider (hackathon/demo, no key needed)
-    # "finnhub" = licensed real provider (requires FINNHUB_API_KEY)
     MARKET_DATA_PROVIDER: str = "mock"
     MARKET_DATA_API_KEY: str = ""
     MARKET_DATA_BASE_URL: str = ""
@@ -39,14 +58,10 @@ class Settings(BaseSettings):
     DEFAULT_GAP_THRESHOLD_PCT: float = 2.0
     HISTORICAL_VOL_MULTIPLIER: float = 1.5
 
-    # --- Optional LLM (explanation rewriting only; never used for truth) ---
+    # --- Optional LLM ---
     LLM_API_KEY: str = ""
     LLM_BASE_URL: str = "https://api.groq.com/openai/v1"
     LLM_MODEL: str = "openai/gpt-oss-20b"
-
-    class Config:
-        env_file = ".env"
-        extra = "ignore"
 
 
 @lru_cache
