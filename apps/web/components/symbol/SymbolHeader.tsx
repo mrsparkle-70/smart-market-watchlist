@@ -1,0 +1,13 @@
+"use client";
+
+import Link from "next/link";
+import type { Quote } from "@/lib/types";
+import { DataFreshnessBadge } from "@/components/DataFreshnessBadge";
+
+function money(value: number | null | undefined) { return value == null ? "—" : `$${value.toFixed(2)}`; }
+
+export function SymbolHeader({ symbol, quote, onRefresh, refreshing }: { symbol: string; quote?: Quote; onRefresh: () => void; refreshing: boolean }) {
+  const move = quote?.change_since_close_pct ?? 0;
+  const positive = move >= 0;
+  return <header className="relative overflow-hidden rounded-3xl border b-line bg-[linear-gradient(120deg,rgba(240,68,94,.18),rgba(255,138,76,.08)_42%,rgba(13,19,32,.92)_78%)] p-5 shadow-[0_20px_70px_-40px_rgba(240,68,94,.55)] sm:p-7"><div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-rose-400/10 blur-3xl" /><div className="relative"><div className="flex flex-wrap items-center justify-between gap-3"><div className="flex items-center gap-2 text-xs text-slate-500"><Link href="/dashboard" className="transition hover:text-rose-200">Dashboard</Link><span>/</span><span className="text-slate-300">Symbol intelligence</span></div><button type="button" className="btn-ghost" onClick={onRefresh} disabled={refreshing}><span aria-hidden="true">↻</span> {refreshing ? "Refreshing…" : "Refresh data"}</button></div><div className="mt-8 flex flex-col justify-between gap-6 lg:flex-row lg:items-end"><div className="min-w-0"><div className="flex flex-wrap items-center gap-3"><span className="rounded-lg border border-rose-300/20 bg-rose-300/10 px-2 py-1 font-num text-xs font-semibold tracking-[0.18em] text-rose-100">MARKET / {symbol}</span>{quote && <DataFreshnessBadge freshness={quote.freshness} marketStatus={quote.market_status} />}</div><h1 className="mt-3 font-num text-4xl font-semibold tracking-[-0.04em] text-white sm:text-5xl">{symbol}</h1><p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-400">A focused view of price action, detected catalysts, provider confidence, and your own investment thesis.</p></div><div className="lg:min-w-[280px] lg:text-right">{quote ? <><div className="font-num text-4xl font-semibold tracking-[-0.04em] text-white">{money(quote.price)}</div><div className={`mt-1 font-num text-lg font-semibold ${positive ? "text-emerald-300" : "text-rose-300"}`}>{positive ? "+" : ""}{quote.change_since_close_pct?.toFixed(2) ?? "0.00"}% <span className="text-xs font-normal text-slate-500">today</span></div><p className="mt-2 text-[11px] text-slate-500">As of {quote.source_timestamp ? new Date(quote.source_timestamp).toLocaleString() : "latest provider snapshot"} · {quote.provider}</p></> : <div className="skeleton ml-auto h-24 w-56" />}</div></div></div></header>;
+}
