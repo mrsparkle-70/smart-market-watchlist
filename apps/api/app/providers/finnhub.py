@@ -6,7 +6,6 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 import logging
-from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -23,9 +22,30 @@ BASE_URL = settings.MARKET_DATA_BASE_URL or "https://finnhub.io/api/v1"
 logger = logging.getLogger("smw.finnhub")
 
 
+def _get_ny_timezone():
+    """Get NY timezone - works on Windows, macOS, and Linux."""
+    try:
+        from zoneinfo import ZoneInfo
+        return ZoneInfo("America/New_York")
+    except (ImportError, KeyError):
+        pass
+    
+    try:
+        from dateutil import tz
+        return tz.gettz("America/New_York")
+    except ImportError:
+        pass
+    
+    # Fallback: EST is UTC-5
+    return timezone(timedelta(hours=-5))
+
+
+_NY_TZ = _get_ny_timezone()
+
+
 def _market_status(now: datetime | None = None) -> str:
     """Return a lightweight NYSE session status for quote freshness display."""
-    ny = (now or datetime.now(timezone.utc)).astimezone(ZoneInfo("America/New_York"))
+    ny = (now or datetime.now(timezone.utc)).astimezone(_NY_TZ)
     if ny.weekday() >= 5:
         return "closed"
     minutes = ny.hour * 60 + ny.minute
