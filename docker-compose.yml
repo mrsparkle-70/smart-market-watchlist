@@ -53,5 +53,22 @@ services:
     depends_on:
       - api
 
+  # One-shot database backup:  docker compose run --rm db-backup
+  # Archives land in ./backups/ (pg_dump custom format, pg_restore-ready).
+  db-backup:
+    image: postgres:16-alpine
+    profiles: ["ops"]
+    environment:
+      PGPASSWORD: smw
+    volumes:
+      - ./backups:/backups
+    entrypoint: >
+      sh -c 'pg_dump --no-owner --no-privileges --format=custom
+      -h postgres -U smw -f /backups/smw-$$(date -u +%Y%m%d-%H%M%S).dump smw
+      && ls -lh /backups | tail -n 5'
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   pgdata:

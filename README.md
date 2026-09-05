@@ -80,8 +80,8 @@ Key design decisions (see `docs/`):
 
 ```bash
 cd apps/api
-.venv/bin/python -m pytest tests/ -q   # 29 tests: features, scoring, detection, auth,
-                                       # watchlists, E2E demo storyline, stale-data rule
+.venv/bin/python -m pytest tests/ -q   # 49 tests: features, scoring, detection, auth,
+                                       # watchlists, notifications, migrations, E2E demo
 ```
 
 ## Repository layout

@@ -43,6 +43,39 @@ product's definition of meaningful.
 Implement the `MarketDataProvider` protocol (`app/providers/base.py`) and register the
 class in `app/providers/__init__.py`. Frontend and services never import a vendor SDK.
 
+## Persistence, migrations & backups (feature #2)
+
+The API runs on **Postgres in production** (`postgresql+psycopg2://...` via
+`DATABASE_URL`) and keeps **SQLite for local dev/tests** (`sqlite:///...`).
+
+**Schema management — Alembic.** Migrations live in `apps/api/alembic/versions/`.
+On startup, `init_db()` detects a Postgres URL and runs `upgrade head` before
+serving, so a deployed container always matches the checked-in history. SQLite
+keeps `create_all` (dev convenience). Migration tests (`tests/test_migrations.py`)
+fail on drift: `upgrade head` must build exactly the tables in `Base.metadata`.
+
+```bash
+cd apps/api
+# author a migration after model changes:
+ALEMBIC_DATABASE_URL='sqlite:///./_gen.db' .venv/bin/alembic revision --autogenerate -m '...'
+# manual apply / inspect:
+ALEMBIC_DATABASE_URL='postgresql+psycopg2://...' .venv/bin/alembic upgrade head
+ALEMBIC_DATABASE_URL='postgresql+psycopg2://...' .venv/bin/alembic current
+```
+
+**Backups.** `python -m app.tools.backup` (from `apps/api/`):
+- Postgres → `pg_dump --format=custom` archives (restore with `pg_restore -d ... <file>`)
+- SQLite → online copy via SQLite's backup API (safe while the API runs)
+- `--keep N` prunes old files (default 7); `--list` shows what exists;
+  `BACKUP_DIR` overrides the output directory (default `<repo>/backups/`, gitignored)
+
+In Docker, `docker compose run --rm db-backup` produces the same pg_dump archive
+into `./backups/` without entering the API container.
+
+**Engine hygiene.** `pool_pre_ping` is on for both dialects; Postgres uses an
+explicit `QueuePool` (5 + 10 overflow) so the asyncio workers can't exhaust
+connections silently.
+
 ## Scaling path (section 17)
 
 - Redis shared quote cache + request dedupe (single-flight per symbol)
