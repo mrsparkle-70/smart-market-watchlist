@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 
 type IconName = "grid" | "list" | "sliders" | "pulse" | "bell";
 
@@ -70,7 +71,7 @@ function Topbar({ pathname, onMenu }: { pathname: string; onMenu: () => void }) 
         <div className="shell-breadcrumb"><span className="shell-breadcrumb-root">MARKET /</span><strong>{current?.label.toUpperCase() ?? "SYMBOL"}</strong></div>
         <div className="shell-topbar-actions">
           <span className="shell-market-clock"><span className="status-dot" /> US MARKET <b>●</b> MONITORING</span>
-          <Link href="/settings" className="shell-icon-button" aria-label="Open preferences"><Icon name="bell" /></Link>
+          <NotificationCenter />
           <span className="shell-avatar" aria-hidden="true">S</span>
         </div>
       </header>

@@ -179,3 +179,33 @@ export interface SimulateResult {
   applied: string[];
   pipeline: Record<string, number | string>;
 }
+
+export interface NotificationChannel {
+  id: number;
+  kind: "email" | "webpush";
+  target: string;
+  enabled: boolean;
+  verified: boolean;
+  last_used_at: string | null;
+  created_at: string;
+}
+
+export interface NotificationLogEntry {
+  id: number;
+  kind: string;
+  title: string;
+  body: string;
+  status: string;
+  error: string;
+  created_at: string;
+  sent_at: string | null;
+  read_at: string | null;
+}
+
+export interface NotificationPreferences {
+  notification_enabled: boolean;
+  daily_digest: boolean;
+  quiet_hours_start: string | null;
+  quiet_hours_end: string | null;
+  timezone: string;
+}

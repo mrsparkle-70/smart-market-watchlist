@@ -4,6 +4,9 @@ import type {
   AttentionFeed,
   Candle,
   NewsItem,
+  NotificationChannel,
+  NotificationLogEntry,
+  NotificationPreferences,
   Preferences,
   Quote,
   Scenario,
@@ -109,4 +112,40 @@ export const api = {
   preferences: () => request<Preferences>("/api/preferences"),
   updatePreferences: (p: Partial<Preferences>) =>
     request("/api/preferences", { method: "PATCH", body: JSON.stringify(p) }),
+  // notifications (feature #1)
+  notificationChannels: () => request<NotificationChannel[]>("/api/notifications/channels"),
+  addEmailChannel: (email: string) =>
+    request<NotificationChannel>("/api/notifications/channels/email", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+  addWebPushChannel: (endpoint: string, keys: { p256dh: string; auth: string }) =>
+    request<NotificationChannel>("/api/notifications/channels/webpush", {
+      method: "POST",
+      body: JSON.stringify({ endpoint, keys }),
+    }),
+  toggleChannel: (id: number, enabled: boolean) =>
+    request<NotificationChannel>(`/api/notifications/channels/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ enabled }),
+    }),
+  removeChannel: (id: number) =>
+    request<void>(`/api/notifications/channels/${id}`, { method: "DELETE" }),
+  testChannel: (id: number) =>
+    request<{ queued_log_id: number; delivered_in_this_call: number }>(
+      `/api/notifications/channels/${id}/test`,
+      { method: "POST" }
+    ),
+  notificationLog: (limit = 50) =>
+    request<NotificationLogEntry[]>(`/api/notifications/log?limit=${limit}`),
+  markNotificationRead: (id: number) =>
+    request<void>(`/api/notifications/log/${id}/read`, { method: "POST" }),
+  notificationPreferences: () =>
+    request<NotificationPreferences>("/api/notifications/preferences"),
+  updateNotificationPreferences: (p: Partial<NotificationPreferences>) =>
+    request<NotificationPreferences>("/api/notifications/preferences", {
+      method: "PATCH",
+      body: JSON.stringify(p),
+    }),
+  vapidPublicKey: () => request<{ publicKey: string }>("/api/notifications/vapid-public-key"),
 };
