@@ -13,8 +13,10 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    Time,
     UniqueConstraint,
 )
+from datetime import time as _time
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -41,6 +43,12 @@ class User(Base):
         back_populates="user", cascade="all, delete-orphan", uselist=False
     )
     event_states: Mapped[list["UserEventState"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    notification_channels: Mapped[list["NotificationChannel"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    notification_logs: Mapped[list["NotificationLog"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
 
@@ -181,6 +189,10 @@ class UserPreferences(Base):
     preferred_sectors: Mapped[str] = mapped_column(String(300), default="")
     notification_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     timezone: Mapped[str] = mapped_column(String(60), default="UTC")
+    # Quiet-hours window and daily-digest toggle (feature #1).
+    quiet_hours_start: Mapped[Optional[_time]] = mapped_column(Time, nullable=True)
+    quiet_hours_end: Mapped[Optional[_time]] = mapped_column(Time, nullable=True)
+    daily_digest: Mapped[bool] = mapped_column(Boolean, default=False)
 
     user: Mapped[User] = relationship(back_populates="preferences")
 
@@ -223,3 +235,55 @@ class Holding(Base):
     quantity: Mapped[float] = mapped_column(Float)
     average_cost: Mapped[float] = mapped_column(Float)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class NotificationChannel(Base):
+    """A user-subscribed delivery endpoint.
+
+    `kind` is 'email' or 'webpush'. For email, `target` is the address and
+    `secret` is unused. For webpush, `target` is the browser endpoint URL and
+    `secret` stores the per-subscription p256dh/private keys encoded as JSON.
+    Verified channels are eligible to receive real notifications.
+    """
+    __tablename__ = "notification_channels"
+    __table_args__ = (
+        UniqueConstraint("user_id", "kind", "target", name="uq_user_channel_target"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(20), index=True)  # email | webpush
+    target: Mapped[str] = mapped_column(String(500))
+    secret: Mapped[str] = mapped_column(Text, default="")
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    user: Mapped[User] = relationship(back_populates="notification_channels")
+
+
+class NotificationLog(Base):
+    """One row per delivery attempt — used for the in-app notification feed
+    and for debugging failed sends. Not a replacement for provider-side logs."""
+    __tablename__ = "notification_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    channel_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("notification_channels.id"), nullable=True, index=True
+    )
+    alert_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("price_alerts.id"), nullable=True, index=True
+    )
+    kind: Mapped[str] = mapped_column(String(20))
+    title: Mapped[str] = mapped_column(String(300), default="")
+    body: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(20), default="queued")  # queued|sent|failed
+    error: Mapped[str] = mapped_column(String(500), default="")
+    payload_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    read_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    user: Mapped[User] = relationship(back_populates="notification_logs")

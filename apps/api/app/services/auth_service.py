@@ -31,6 +31,11 @@ def _record_attempt(key: str) -> None:
     _login_attempts.setdefault(key, []).append(time.time())
 
 
+def reset_rate_limiters() -> None:
+    """Clear the in-memory limiter (used by tests to isolate from prior tests)."""
+    _login_attempts.clear()
+
+
 def register(db: Session, email: str, password: str) -> User:
     email = email.strip().lower()
     if _rate_limited(f"register:{email}"):

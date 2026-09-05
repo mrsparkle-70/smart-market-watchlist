@@ -67,6 +67,25 @@ class Settings(BaseSettings):
     LLM_BASE_URL: str = "https://api.groq.com/openai/v1"
     LLM_MODEL: str = "openai/gpt-oss-20b"
 
+    # --- Notifications (feature #1) ---
+    # SMTP is optional. When SMTP_HOST is empty, email sends are recorded in
+    # the in-app log but not actually transmitted (useful for dev / CI).
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = "alerts@smartmarketwatchlist.local"
+    SMTP_USE_TLS: bool = True
+
+    # VAPID keys for Web Push (RFC 8030). Generate once with:
+    #   python -c "from py_vapid import Vapid; v=Vapid(); v.save_keys('/tmp/vapid.json')"
+    VAPID_PRIVATE_KEY: str = ""
+    VAPID_PUBLIC_KEY: str = ""
+    VAPID_SUBJECT: str = "mailto:admin@smartmarketwatchlist.local"
+
+    # Public base URL used in email links and push icon URLs.
+    PUBLIC_BASE_URL: str = "http://localhost:3000"
+
 
 @lru_cache
 def get_settings() -> Settings:

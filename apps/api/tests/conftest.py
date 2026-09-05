@@ -21,8 +21,13 @@ from app.providers import get_provider  # noqa: E402
 
 @pytest.fixture(autouse=True)
 def _isolate_db():
+    from app.services import auth_service
+
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
+    # The auth rate limiter is in-memory and would otherwise trip across tests
+    # that reuse the same registration email (10 attempts / 5 min window).
+    auth_service.reset_rate_limiters()
     yield
     Base.metadata.drop_all(bind=engine)
 

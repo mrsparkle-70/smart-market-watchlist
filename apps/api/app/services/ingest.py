@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models import MarketEvent, MarketFeature, MarketSnapshot, NewsItem, PriceAlert, WatchlistSymbol
+from app.models import MarketEvent, MarketFeature, MarketSnapshot, NewsItem, PriceAlert, User, WatchlistSymbol
 from app.providers.base import MarketDataProvider
 from app.services import attention as A
 from app.services import change_detection as CD
@@ -79,6 +79,7 @@ async def _ingest_symbol(
     move_pct = ((quote.price - quote.previous_close) / quote.previous_close * 100.0
                 if quote.previous_close else 0.0)
     alert_rows = db.execute(select(PriceAlert).where(PriceAlert.symbol == quote.symbol, PriceAlert.enabled.is_(True))).scalars()
+    triggered_alerts: list[PriceAlert] = []
     for alert in alert_rows:
         triggered = (
             (alert.condition == "price_above" and quote.price >= alert.threshold)
@@ -90,9 +91,17 @@ async def _ingest_symbol(
         if triggered and cooldown_ok:
             alert.last_triggered_at = now
             alert.last_triggered_value = quote.price
+            triggered_alerts.append(alert)
     # Persist alert state now so it survives even the baseline early-return path
     # below (prev is None), where the function returns before the main commit.
     db.flush()
+    # Enqueue notification fan-out for any alerts that just fired.
+    if triggered_alerts:
+        from app.services import notify as N
+        for alert in triggered_alerts:
+            owner = db.get(User, alert.user_id)
+            if owner is not None:
+                N.enqueue_alert(db, owner, alert, quote.price, now)
 
     candle_closes = [c.close for c in candles]
     candle_volumes = [c.volume for c in candles]

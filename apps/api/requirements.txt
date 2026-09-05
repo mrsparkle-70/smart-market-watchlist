@@ -13,3 +13,6 @@ tzdata>=2023.3 ; sys_platform == "win32"
 # Optional LLM rewrite layer (python 3.10+):
 openai>=1.50.0 ; python_version >= "3.10"
 
+
+# Notification delivery (feature #1)
+pywebpush>=2.0.0
