@@ -66,6 +66,34 @@ def save_symbol_note(symbol: str, body: SymbolNoteUpdate, user: User = Depends(g
     return {"symbol": normalized, "body": note.body, "updated_at": note.updated_at}
 
 
+@router.get("/alerts/triggered")
+def list_triggered_alerts(limit: int = 25, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Return the user's alerts that have fired, newest first.
+
+    Scoped to symbols currently on the user's watchlists, so triggered alerts
+    for symbols the user no longer follows are filtered out. Registered before
+    the `/{symbol}/...` routes so the static path matches first.
+    """
+    limit = max(1, min(limit, 100))
+    watched = db.execute(
+        select(WatchlistSymbol.symbol).join(Watchlist, Watchlist.id == WatchlistSymbol.watchlist_id)
+        .where(Watchlist.user_id == user.id)
+    ).scalars().all()
+    if not watched:
+        return []
+    rows = db.execute(
+        select(PriceAlert)
+        .where(PriceAlert.user_id == user.id,
+               PriceAlert.last_triggered_at.isnot(None),
+               PriceAlert.symbol.in_(watched))
+        .order_by(PriceAlert.last_triggered_at.desc())
+        .limit(limit)
+    ).scalars()
+    return [{"id": a.id, "symbol": a.symbol, "condition": a.condition, "threshold": a.threshold,
+             "enabled": a.enabled, "created_at": a.created_at, "last_triggered_at": a.last_triggered_at,
+             "last_triggered_value": a.last_triggered_value} for a in rows]
+
+
 @router.get("/{symbol}/alerts")
 def list_alerts(symbol: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     normalized = _ensure_watched(db, user.id, symbol)
@@ -133,8 +161,9 @@ def latest(symbol: str, user: User = Depends(get_current_user), db: Session = De
 
 @router.get("/{symbol}/history")
 def history(symbol: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    normalized = _ensure_watched(db, user.id, symbol)
     snaps = list(db.execute(
-        select(MarketSnapshot).where(MarketSnapshot.symbol == symbol.upper())
+        select(MarketSnapshot).where(MarketSnapshot.symbol == normalized)
         .order_by(MarketSnapshot.captured_at.asc()).limit(500)
     ).scalars())
     return [
@@ -146,7 +175,7 @@ def history(symbol: str, user: User = Depends(get_current_user), db: Session = D
 
 @router.get("/{symbol}/analytics")
 def analytics(symbol: str, days: int = 90, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    normalized = symbol.upper()
+    normalized = _ensure_watched(db, user.id, symbol)
     days = max(1, min(days, 730))
     snaps = list(db.execute(
         select(MarketSnapshot).where(MarketSnapshot.symbol == normalized)
@@ -175,8 +204,9 @@ def analytics(symbol: str, days: int = 90, user: User = Depends(get_current_user
 
 @router.get("/{symbol}/events")
 def events(symbol: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    normalized = _ensure_watched(db, user.id, symbol)
     rows = list(db.execute(
-        select(MarketEvent).where(MarketEvent.symbol == symbol.upper())
+        select(MarketEvent).where(MarketEvent.symbol == normalized)
         .order_by(MarketEvent.detected_at.desc()).limit(100)
     ).scalars())
     return [{
@@ -191,8 +221,9 @@ def events(symbol: str, user: User = Depends(get_current_user), db: Session = De
 def news(symbol: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     from app.models import NewsItem
 
+    normalized = _ensure_watched(db, user.id, symbol)
     rows = list(db.execute(
-        select(NewsItem).where(NewsItem.symbol == symbol.upper())
+        select(NewsItem).where(NewsItem.symbol == normalized)
         .order_by(NewsItem.published_at.desc().nullslast()).limit(30)
     ).scalars())
     return [{

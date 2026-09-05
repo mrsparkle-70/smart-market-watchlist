@@ -53,5 +53,8 @@ async def run_pipeline(stop_event: asyncio.Event) -> None:
 def start_pipeline() -> asyncio.Task | None:
     if not settings.PIPELINE_ENABLED:
         return None
+    # Started from within the FastAPI lifespan (an async context), so a running
+    # loop is guaranteed. asyncio.create_task is the supported API on 3.10+;
+    # get_event_loop() is deprecated and can fail when no loop is running.
     stop_event = asyncio.Event()
-    return asyncio.get_event_loop().create_task(run_pipeline(stop_event))
+    return asyncio.create_task(run_pipeline(stop_event))

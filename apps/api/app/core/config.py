@@ -20,6 +20,10 @@ def _find_env_file() -> str | None:
 _env_file = _find_env_file()
 
 
+# Well-known placeholder secrets that must never be used in production.
+_INSECURE_JWT_SECRETS = {"change-me-in-production", "dev-secret-change-me", "test-secret"}
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=_env_file,
@@ -66,7 +70,15 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    settings = Settings()
+    # Fail fast in production if the JWT secret is still a public placeholder:
+    # signing tokens with a well-known secret lets anyone forge auth cookies.
+    if settings.ENV == "production" and settings.JWT_SECRET in _INSECURE_JWT_SECRETS:
+        raise RuntimeError(
+            "JWT_SECRET is set to an insecure default while ENV=production. "
+            "Set a strong, unique JWT_SECRET before starting the API."
+        )
+    return settings
 
 
 settings = get_settings()

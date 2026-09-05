@@ -221,4 +221,43 @@ def test_portfolio_alerts_and_notes_are_persisted(client, provider):
     assert client.post(f"/api/market/refresh-watchlist/{wid}").status_code == 200
     triggered = client.get("/api/market/NVDA/alerts").json()[0]
     assert triggered["last_triggered_at"] is not None
+    # Triggered-alerts feed surfaces fired alerts (fix for review item #3).
+    feed = client.get("/api/market/alerts/triggered").json()
+    assert any(a["id"] == alert.json()["id"] and a["last_triggered_at"] is not None for a in feed)
     assert client.delete("/api/portfolio/NVDA").status_code == 204
+    # A different user must not see this user's triggered alerts.
+    client.post("/api/auth/logout")
+    from tests.conftest import register_and_login as rl
+    rl(client, email="other@example.com")
+    assert client.get("/api/market/alerts/triggered").json() == []
+
+
+def test_market_endpoints_require_watchlist_membership(client, provider):
+    """Section 16: every per-symbol route must verify the user watches the symbol."""
+    register_and_login(client)
+    # NVDA is not on this user's watchlist.
+    for path in (
+        "/api/market/NVDA/history",
+        "/api/market/NVDA/analytics",
+        "/api/market/NVDA/events",
+        "/api/market/NVDA/news",
+    ):
+        assert client.get(path).status_code == 404, f"{path} leaked data"
+
+
+def test_jwt_secret_insecure_default_blocked_in_production(monkeypatch):
+    """Section 16: do not allow production to start with a public JWT secret."""
+    from app.core.config import get_settings
+
+    get_settings.cache_clear()
+    monkeypatch.setenv("ENV", "production")
+    monkeypatch.setenv("JWT_SECRET", "change-me-in-production")
+    try:
+        try:
+            get_settings()
+        except RuntimeError as exc:
+            assert "JWT_SECRET" in str(exc)
+        else:
+            raise AssertionError("expected RuntimeError for insecure JWT_SECRET in production")
+    finally:
+        get_settings.cache_clear()

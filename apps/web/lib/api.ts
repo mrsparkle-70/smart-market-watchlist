@@ -84,6 +84,7 @@ export const api = {
   events: (symbol: string) => request<SymbolEvent[]>(`/api/market/${symbol}/events`),
   news: (symbol: string) => request<NewsItem[]>(`/api/market/${symbol}/news`),
   alerts: (symbol: string) => request<import("./types").PriceAlert[]>(`/api/market/${symbol}/alerts`),
+  triggeredAlerts: (limit = 25) => request<import("./types").PriceAlert[]>(`/api/market/alerts/triggered?limit=${limit}`),
   createAlert: (symbol: string, condition: string, threshold: number) => request<import("./types").PriceAlert>(`/api/market/${symbol}/alerts`, { method: "POST", body: JSON.stringify({ condition, threshold }) }),
   deleteAlert: (symbol: string, id: number) => request<void>(`/api/market/${symbol}/alerts/${id}`, { method: "DELETE" }),
   portfolio: () => request<import("./types").PortfolioSummary>("/api/portfolio"),

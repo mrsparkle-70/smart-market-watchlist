@@ -90,6 +90,9 @@ async def _ingest_symbol(
         if triggered and cooldown_ok:
             alert.last_triggered_at = now
             alert.last_triggered_value = quote.price
+    # Persist alert state now so it survives even the baseline early-return path
+    # below (prev is None), where the function returns before the main commit.
+    db.flush()
 
     candle_closes = [c.close for c in candles]
     candle_volumes = [c.volume for c in candles]
