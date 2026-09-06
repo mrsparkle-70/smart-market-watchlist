@@ -23,6 +23,7 @@ export function PriceChart({ candles }: { candles: Candle[] }) {
   const [showVolume, setShowVolume] = useState(true);
   const [showMa20, setShowMa20] = useState(true);
   const [showMa50, setShowMa50] = useState(true);
+  const [chartType, setChartType] = useState<"area" | "candles">("area");
   const chartCandles = useMemo(() => {
     if (range === "ALL") return candles;
     const days = range === "1M" ? 30 : range === "3M" ? 90 : 365;
@@ -32,13 +33,18 @@ export function PriceChart({ candles }: { candles: Candle[] }) {
 
   // Duplicate-safe ingestion (#42): providers can return duplicate candles or
   // millisecond timestamps; lightweight-charts requires strictly ascending,
-  // unique times, so keep one observation per second (newest wins).
+  // unique times, so keep one observation per second (newest wins). Full OHLC
+  // is carried through for the candlestick view; snapshots lacking intraday
+  // extremes fall back to close for open/high/low.
   const chartData = useMemo(() => {
-    const byTime = new Map<number, { time: never; close: number; volume: number | null }>();
+    const byTime = new Map<number, { time: never; open: number; high: number; low: number; close: number; volume: number | null }>();
     chartCandles.forEach((c) => {
       const time = Math.floor(new Date(c.ts).getTime() / 1000);
       if (!Number.isFinite(time) || !Number.isFinite(c.close)) return;
-      byTime.set(time, { time: time as never, close: c.close, volume: c.volume });
+      const open = c.open ?? c.close;
+      const high = Math.max(c.high ?? c.close, c.close, open);
+      const low = Math.min(c.low ?? c.close, c.close, open);
+      byTime.set(time, { time: time as never, open, high, low, close: c.close, volume: c.volume });
     });
     return Array.from(byTime.values()).sort((a, b) => (a.time as number) - (b.time as number));
   }, [chartCandles]);
@@ -72,15 +78,29 @@ export function PriceChart({ candles }: { candles: Candle[] }) {
       grid: { vertLines: { color: "#1f2937" }, horzLines: { color: "#1f2937" } },
       timeScale: { timeVisible: true },
     });
-    const priceSeries = chart.addAreaSeries({
-      lineColor: "#f0445e",
-      topColor: "rgba(240,68,94,0.3)",
-      bottomColor: "rgba(240,68,94,0.02)",
-      lineWidth: 2,
-    });
-    priceSeries.setData(chartData.map((d) => ({ time: d.time, value: d.close })));
-    // Leave the bottom quarter of the pane for the volume histogram.
-    priceSeries.priceScale().applyOptions({ scaleMargins: { top: 0.1, bottom: showVolume ? 0.25 : 0.05 } });
+    // Price pane: area (line + gradient) or candlesticks (#44), sharing the
+    // same scale margins so volume keeps its reserved quarter either way.
+    const priceMargins = { scaleMargins: { top: 0.1, bottom: showVolume ? 0.25 : 0.05 } };
+    let priceSeries;
+    if (chartType === "candles") {
+      priceSeries = chart.addCandlestickSeries({
+        upColor: "#10b981",
+        downColor: "#f0445e",
+        wickUpColor: "rgba(16,185,129,0.7)",
+        wickDownColor: "rgba(240,68,94,0.7)",
+        borderVisible: false,
+      });
+      priceSeries.setData(chartData.map((d) => ({ time: d.time, open: d.open, high: d.high, low: d.low, close: d.close })));
+    } else {
+      priceSeries = chart.addAreaSeries({
+        lineColor: "#f0445e",
+        topColor: "rgba(240,68,94,0.3)",
+        bottomColor: "rgba(240,68,94,0.02)",
+        lineWidth: 2,
+      });
+      priceSeries.setData(chartData.map((d) => ({ time: d.time, value: d.close })));
+    }
+    priceSeries.priceScale().applyOptions(priceMargins);
 
     if (showVolume) {
       const volumeSeries = chart.addHistogramSeries({
@@ -108,7 +128,7 @@ export function PriceChart({ candles }: { candles: Candle[] }) {
       window.removeEventListener("resize", onResize);
       chart.remove();
     };
-  }, [chartData, volumeData, ma20, ma50, showVolume, showMa20, showMa50]);
+  }, [chartData, volumeData, ma20, ma50, showVolume, showMa20, showMa50, chartType]);
 
   if (candles.length === 0) {
     return (
@@ -124,6 +144,9 @@ export function PriceChart({ candles }: { candles: Candle[] }) {
       <div className="mb-3 flex items-center justify-between gap-2">
         <span className="text-xs text-slate-500">{chartCandles.length} observations</span>
         <div className="flex flex-wrap items-center justify-end gap-1">
+          <button className={toggle(chartType === "area")} onClick={() => setChartType("area")} aria-label="Line chart">Line</button>
+          <button className={toggle(chartType === "candles")} onClick={() => setChartType("candles")} aria-label="Candlestick chart">Candles</button>
+          <span className="mx-1 text-slate-700">|</span>
           <button className={toggle(showVolume)} onClick={() => setShowVolume(!showVolume)}>Volume</button>
           <button className={toggle(showMa20)} onClick={() => setShowMa20(!showMa20)} aria-label="Toggle 20-period moving average">MA20</button>
           <button className={toggle(showMa50)} onClick={() => setShowMa50(!showMa50)} aria-label="Toggle 50-period moving average">MA50</button>
