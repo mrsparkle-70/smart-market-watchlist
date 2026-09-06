@@ -8,6 +8,7 @@ import { PriceChart } from "@/components/PriceChart";
 import { EventTimeline } from "@/components/EventTimeline";
 import { AlertManager } from "@/components/AlertManager";
 import { AnalyticsStrip } from "@/components/AnalyticsStrip";
+import { AnalyticsPanel } from "@/components/AnalyticsPanel";
 import { SymbolHeader } from "@/components/symbol/SymbolHeader";
 import { SymbolMetricGrid } from "@/components/symbol/SymbolMetricGrid";
 import { SymbolNewsList } from "@/components/symbol/SymbolNewsList";
@@ -38,6 +39,8 @@ export default function SymbolPage({ params }: { params: { symbol: string } }) {
       <section className="panel min-w-0 overflow-hidden p-4 sm:p-5"><div className="mb-4 flex flex-wrap items-end justify-between gap-3"><div><div className="kpi-label">Price action</div><h2 className="mt-1 text-lg font-semibold text-white">Historical signal</h2></div><span className="text-xs text-slate-500">{history.data?.length ?? 0} stored observations</span></div>{analytics.data && analytics.data.observations > 0 && <div className="mb-5"><AnalyticsStrip data={analytics.data} /></div>}{history.isLoading ? <SymbolSkeleton className="h-[320px]" /> : history.isError ? <SymbolError title="Historical prices unavailable" error={history.error} onRetry={() => history.refetch()} /> : <PriceChart candles={history.data ?? []} />}{analytics.isError && <p className="mt-3 text-xs text-amber-300">Analytics are temporarily unavailable; the chart can still be explored.</p>}</section>
       <section className="panel min-w-0 p-4 sm:p-5"><div className="mb-4"><div className="kpi-label">Signal monitor</div><h2 className="mt-1 text-lg font-semibold text-white">Detected changes</h2><p className="mt-1 text-xs leading-relaxed text-slate-500">Events are ranked by attention, confidence, and corroborating evidence.</p></div>{events.isLoading ? <div className="space-y-3"><SymbolSkeleton className="h-16" /><SymbolSkeleton className="h-16" /></div> : events.isError ? <SymbolError title="Event history unavailable" error={events.error} onRetry={() => events.refetch()} /> : events.data?.length ? <EventTimeline events={events.data} /> : <SymbolEmpty title="No detected changes" detail="The monitor has not found a meaningful event for this symbol yet." />}</section>
     </div>
+
+    <AnalyticsPanel symbol={symbol} candles={history.data ?? []} />
 
     <div className="grid gap-4 lg:grid-cols-2">
       <section className="panel min-w-0 p-4 sm:p-5"><div className="mb-4 flex items-end justify-between gap-3"><div><div className="kpi-label">Information flow</div><h2 className="mt-1 text-lg font-semibold text-white">Scored news</h2></div><span className="text-xs text-slate-500">Provider-ranked</span></div><SymbolNewsList news={news.data} loading={news.isLoading} error={news.error} onRetry={() => news.refetch()} /></section>

@@ -180,6 +180,18 @@ export interface SimulateResult {
   pipeline: Record<string, number | string>;
 }
 
+// relative performance (feature #6)
+export interface RelativePoint {
+  date: string;
+  symbol_pct: number;
+  benchmark_pct: number;
+}
+export interface RelativeResponse {
+  benchmark: string;
+  days: number;
+  points: RelativePoint[];
+}
+
 export interface NotificationChannel {
   id: number;
   kind: "email" | "webpush";

@@ -9,6 +9,7 @@ import type {
   NotificationPreferences,
   Preferences,
   Quote,
+  RelativeResponse,
   Scenario,
   SimulateResult,
   SymbolEvent,
@@ -148,4 +149,7 @@ export const api = {
       body: JSON.stringify(p),
     }),
   vapidPublicKey: () => request<{ publicKey: string }>("/api/notifications/vapid-public-key"),
+  // relative performance vs benchmark (feature #6)
+  relative: (symbol: string, days = 90) =>
+    request<RelativeResponse>(`/api/market/${symbol}/relative?days=${days}`),
 };

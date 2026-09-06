@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -187,6 +188,53 @@ def history(symbol: str, limit: int = 1000, user: User = Depends(get_current_use
          "low": s.low_price, "close": s.price, "volume": s.volume}
         for s in deduped
     ]
+
+
+@router.get("/{symbol}/relative")
+def relative_performance(symbol: str, benchmark: Optional[str] = None, days: int = 90,
+                         user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Daily cumulative % return of the symbol vs a benchmark (roadmap #46).
+
+    Both series are resampled to one close per UTC day (the last snapshot of
+    the day) and rebased to 0% on the first common day, so the comparison is
+    aligned even when the two symbols were captured at different times.
+    """
+    from app.core.config import settings
+
+    normalized = _ensure_watched(db, user.id, symbol)
+    bench = (benchmark or settings.BENCHMARK_SYMBOL).upper()
+    if bench == normalized:
+        raise HTTPException(status_code=400, detail="Benchmark must differ from the symbol")
+    days = max(5, min(days, 730))
+
+    def daily_last_close(sym: str) -> dict[str, float]:
+        rows = db.execute(
+            select(MarketSnapshot.captured_at, MarketSnapshot.price)
+            .where(MarketSnapshot.symbol == sym)
+            .order_by(MarketSnapshot.captured_at.desc())
+            .limit(days * 30)
+        ).all()
+        out: dict[str, float] = {}
+        for captured_at, price in rows:  # newest first → first write is the last close of that day
+            out.setdefault(captured_at.date().isoformat(), float(price))
+        return out
+
+    sym_daily = daily_last_close(normalized)
+    bench_daily = daily_last_close(bench)
+    common = sorted(set(sym_daily) & set(bench_daily))[-days:]
+    if len(common) < 2:
+        return {"benchmark": bench, "days": days, "points": []}
+
+    sym_base, bench_base = sym_daily[common[0]], bench_daily[common[0]]
+    points = [
+        {
+            "date": day,
+            "symbol_pct": round((sym_daily[day] / sym_base - 1) * 100, 3),
+            "benchmark_pct": round((bench_daily[day] / bench_base - 1) * 100, 3),
+        }
+        for day in common
+    ]
+    return {"benchmark": bench, "days": days, "points": points}
 
 
 @router.get("/{symbol}/analytics")

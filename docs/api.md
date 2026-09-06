@@ -28,6 +28,7 @@ Symbol addition validates the ticker against the provider (422 on unknown, 409 o
 |---|---|---|
 | GET | `/api/market/{symbol}/latest` | quote + freshness + data quality |
 | GET | `/api/market/{symbol}/history?limit=1000` | chart candles (OHLCV points), most-recent window oldest→newest, same-second snapshots deduped |
+| GET | `/api/market/{symbol}/relative?benchmark=SPY&days=90` | daily cumulative % return vs benchmark, rebased to 0% on the first common day (one close per UTC day; default benchmark `SPY`, 5–730 days) |
 | GET | `/api/market/{symbol}/analytics` | rolling analytics (most recent window) |
 | GET | `/api/market/{symbol}/events` | full detected-event timeline |
 | POST | `/api/market/{symbol}/refresh` | run one pipeline pass for a symbol |

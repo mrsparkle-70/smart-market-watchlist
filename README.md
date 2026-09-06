@@ -80,7 +80,7 @@ Key design decisions (see `docs/`):
 
 ```bash
 cd apps/api
-.venv/bin/python -m pytest tests/ -q   # 52 tests: features, scoring, detection, auth,
+.venv/bin/python -m pytest tests/ -q   # 56 tests: features, scoring, detection, auth,
                                        # watchlists, notifications, migrations, chart history,
                                        # E2E demo
 ```
