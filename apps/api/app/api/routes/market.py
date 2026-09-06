@@ -160,16 +160,32 @@ def latest(symbol: str, user: User = Depends(get_current_user), db: Session = De
 
 
 @router.get("/{symbol}/history")
-def history(symbol: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def history(symbol: str, limit: int = 1000, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Candle series for the price chart (feature #3, roadmap #41).
+
+    Returns the most recent `limit` snapshots ordered oldest → newest, with
+    duplicate-safe ingestion (#42): multiple snapshots captured within the same
+    second collapse to a single point (the newest wins), so the chart data is
+    always strictly ascending and unique per timestamp.
+    """
     normalized = _ensure_watched(db, user.id, symbol)
+    limit = max(10, min(limit, 5000))
+    # Take the newest window first (desc + limit), then re-sort ascending.
     snaps = list(db.execute(
         select(MarketSnapshot).where(MarketSnapshot.symbol == normalized)
-        .order_by(MarketSnapshot.captured_at.asc()).limit(500)
+        .order_by(MarketSnapshot.captured_at.desc()).limit(limit)
     ).scalars())
+    snaps.reverse()
+
+    by_second: dict[int, MarketSnapshot] = {}
+    for s in snaps:
+        by_second[int(s.captured_at.timestamp())] = s
+    deduped = [by_second[key] for key in sorted(by_second)]
+
     return [
         {"ts": s.captured_at, "open": s.open_price, "high": s.high_price,
          "low": s.low_price, "close": s.price, "volume": s.volume}
-        for s in snaps
+        for s in deduped
     ]
 
 
@@ -177,10 +193,13 @@ def history(symbol: str, user: User = Depends(get_current_user), db: Session = D
 def analytics(symbol: str, days: int = 90, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     normalized = _ensure_watched(db, user.id, symbol)
     days = max(1, min(days, 730))
+    # Take the newest snapshots first (desc + limit), then re-sort ascending —
+    # an asc+limit would silently return the *oldest* rows once history grows.
     snaps = list(db.execute(
         select(MarketSnapshot).where(MarketSnapshot.symbol == normalized)
-        .order_by(MarketSnapshot.captured_at.asc()).limit(2000)
+        .order_by(MarketSnapshot.captured_at.desc()).limit(2000)
     ).scalars())
+    snaps.reverse()
     if not snaps:
         return {"symbol": normalized, "observations": 0, "first_price": None, "last_price": None,
                 "return_pct": None, "high": None, "low": None, "max_drawdown_pct": None,
